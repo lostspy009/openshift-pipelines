@@ -54,8 +54,11 @@ spec:
         metadata:
           name: allow-same-namespace
           namespace: $(params.NAMESPACE_NAME)
+          labels:
+            app.kubernetes.io/managed-by: tekton-pipeline
+            app.kubernetes.io/created-by: $(params.REQUESTER_ID)
           annotations:
-            openshift.io/requester: $(params.REQUESTER_ID)
+            pipeline.tekton.dev/created-by: $(params.REQUESTER_ID)
         spec:
           podSelector: {}
           policyTypes:
@@ -72,8 +75,11 @@ spec:
         metadata:
           name: allow-openshift-monitoring
           namespace: $(params.NAMESPACE_NAME)
+          labels:
+            app.kubernetes.io/managed-by: tekton-pipeline
+            app.kubernetes.io/created-by: $(params.REQUESTER_ID)
           annotations:
-            openshift.io/requester: $(params.REQUESTER_ID)
+            pipeline.tekton.dev/created-by: $(params.REQUESTER_ID)
         spec:
           podSelector: {}
           policyTypes:
@@ -90,8 +96,11 @@ spec:
         metadata:
           name: allow-openshift-ingress
           namespace: $(params.NAMESPACE_NAME)
+          labels:
+            app.kubernetes.io/managed-by: tekton-pipeline
+            app.kubernetes.io/created-by: $(params.REQUESTER_ID)
           annotations:
-            openshift.io/requester: $(params.REQUESTER_ID)
+            pipeline.tekton.dev/created-by: $(params.REQUESTER_ID)
         spec:
           podSelector: {}
           policyTypes:
