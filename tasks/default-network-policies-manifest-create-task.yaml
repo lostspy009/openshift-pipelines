@@ -1,0 +1,107 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: default-network-policies-manifest-create
+  labels:
+    app.kubernetes.io/name: default-network-policies-manifest-create
+    app.kubernetes.io/version: "0.1"
+spec:
+  description: >-
+    This task creates default network policy manifest files.
+  params:
+    - name: REQUESTER_ID
+      description: Requester ID
+      type: string
+    - name: NAMESPACE_NAME
+      description: Namespace name
+      type: string
+  workspaces:
+    - name: source
+      description: Source workspace
+    - name: output
+      description: Output workspace for manifests
+  steps:
+    - name: create-network-policies
+      image: registry.redhat.io/ubi8/ubi:latest
+      script: |
+        #!/bin/bash
+        set -e
+        
+        # Create namespace directory if it doesn't exist
+        mkdir -p $(workspaces.output.path)/namespaces/$(params.NAMESPACE_NAME)
+        
+        # Create network policies manifest
+        cat > $(workspaces.output.path)/namespaces/$(params.NAMESPACE_NAME)/network-policies.yaml << EOF
+        # Default deny all ingress traffic
+        apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        metadata:
+          name: deny-all-ingress
+          namespace: $(params.NAMESPACE_NAME)
+          labels:
+            app.kubernetes.io/managed-by: tekton-pipeline
+            app.kubernetes.io/created-by: $(params.REQUESTER_ID)
+          annotations:
+            pipeline.tekton.dev/created-by: $(params.REQUESTER_ID)
+        spec:
+          podSelector: {}
+          policyTypes:
+          - Ingress
+        ---
+        # Allow ingress from same namespace
+        apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        metadata:
+          name: allow-same-namespace
+          namespace: $(params.NAMESPACE_NAME)
+          annotations:
+            openshift.io/requester: $(params.REQUESTER_ID)
+        spec:
+          podSelector: {}
+          policyTypes:
+          - Ingress
+          ingress:
+          - from:
+            - namespaceSelector:
+                matchLabels:
+                  name: $(params.NAMESPACE_NAME)
+        ---
+        # Allow ingress from OpenShift monitoring
+        apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        metadata:
+          name: allow-openshift-monitoring
+          namespace: $(params.NAMESPACE_NAME)
+          annotations:
+            openshift.io/requester: $(params.REQUESTER_ID)
+        spec:
+          podSelector: {}
+          policyTypes:
+          - Ingress
+          ingress:
+          - from:
+            - namespaceSelector:
+                matchLabels:
+                  name: openshift-monitoring
+        ---
+        # Allow ingress from OpenShift ingress
+        apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        metadata:
+          name: allow-openshift-ingress
+          namespace: $(params.NAMESPACE_NAME)
+          annotations:
+            openshift.io/requester: $(params.REQUESTER_ID)
+        spec:
+          podSelector: {}
+          policyTypes:
+          - Ingress
+          ingress:
+          - from:
+            - namespaceSelector:
+                matchLabels:
+                  name: openshift-ingress
+        EOF
+        
+        echo "Network policies manifest created successfully"
+        cat $(workspaces.output.path)/namespaces/$(params.NAMESPACE_NAME)/network-policies.yaml

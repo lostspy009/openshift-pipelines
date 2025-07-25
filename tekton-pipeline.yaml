@@ -1,0 +1,176 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: create-namespace
+spec:
+  params:
+    - name: MANIFEST_GIT_REPO
+      type: string
+      default: 'https://github.com/lostspy009/openshift-pipelines.git'
+      description: Git repo url for config manifests
+    - name: MANIFEST_GIT_BRANCH
+      type: string
+      default: main
+      description: Git branch for config manifest
+    - name: REQUESTER_ID
+      type: string
+      description: Requester ID
+    - name: NAMESPACE_NAME
+      type: string
+      description: Namespace name
+    - name: CLUSTER_ENV
+      type: string
+      description: Cluster Environment
+    - name: CLUSTER
+      type: string
+      description: Cluster Name
+    - name: REQUESTS_CPU
+      type: string
+      description: CPU Resource Requests
+    - name: LIMITS_CPU
+      type: string
+      description: CPU Resource Limits
+    - name: MAX_PODS
+      type: string
+      description: Maximum Pods
+    - name: REQUESTS_MEMORY
+      type: string
+      description: Memory Resource Requests
+    - name: LIMITS_MEMORY
+      type: string
+      description: Memory Resource Limits
+    - name: ENABLE_BACKUP
+      type: string
+      default: disabled
+      description: Mark Project for Backups
+    - name: ISTIO_DISCOVERY
+      type: string
+      default: disabled
+      description: Enable Istio discovery
+    - name: ISTIO_REV
+      type: string
+      default: ''
+      description: Istio Revision
+    - name: LABELS
+      type: string
+      default: '{}'
+      description: Optional JSON String of Additional Namespace labels
+    - name: AUTO_MERGE_PR
+      type: string
+      default: 'false'
+      description: Automatically Merge PR
+
+  tasks:
+    - name: clone-manifest-repo
+      taskRef:
+        kind: Task
+        name: clone-manifest-repo
+      workspaces:
+        - name: output
+        - name: source
+
+    - name: namespace-manifest-create
+      params:
+        - name: REQUESTER_ID
+          value: $(params.REQUESTER_ID)
+        - name: NAMESPACE_NAME
+          value: $(params.NAMESPACE_NAME)
+        - name: ENABLE_BACKUP
+          value: $(params.ENABLE_BACKUP)
+        - name: ISTIO_DISCOVERY
+          value: $(params.ISTIO_DISCOVERY)
+        - name: ISTIO_REV
+          value: $(params.ISTIO_REV)
+        - name: LABELS
+          value: $(params.LABELS)
+      taskRef:
+        kind: Task
+        name: namespace-manifest-create
+      workspaces:
+        - name: source
+        - name: output
+
+    - name: default-quotas-manifest-create
+      params:
+        - name: REQUESTER_ID
+          value: $(params.REQUESTER_ID)
+        - name: NAMESPACE_NAME
+          value: $(params.NAMESPACE_NAME)
+        - name: REQUESTS_CPU
+          value: $(params.REQUESTS_CPU)
+        - name: LIMITS_CPU
+          value: $(params.LIMITS_CPU)
+        - name: MAX_PODS
+          value: $(params.MAX_PODS)
+        - name: REQUESTS_MEMORY
+          value: $(params.REQUESTS_MEMORY)
+        - name: LIMITS_MEMORY
+          value: $(params.LIMITS_MEMORY)
+      taskRef:
+        kind: Task
+        name: default-quotas-manifest-create
+      workspaces:
+        - name: source
+        - name: output
+    - name: default-network-policies-manifest-create
+      params:
+        - name: REQUESTER_ID
+          value: $(params.REQUESTER_ID)
+        - name: NAMESPACE_NAME
+          value: $(params.NAMESPACE_NAME)
+      runAfter:
+        - namespace-manifest-create
+      taskRef:
+        kind: Task
+        name: default-network-policies-manifest-create
+      workspaces:
+        - name: output
+        - name: source
+
+    - name: default-rolebindings-manifest-create
+      params:
+        - name: REQUESTER_ID
+          value: $(params.REQUESTER_ID)
+        - name: NAMESPACE_NAME
+          value: $(params.NAMESPACE_NAME)
+      runAfter:
+        - namespace-manifest-create
+      taskRef:
+        kind: Task
+        name: default-rolebindings-manifest-create
+      workspaces:
+        - name: output
+        - name: source
+
+    - name: push-to-manifest-repo
+      params:
+        - name: MANIFEST_GIT_REPO
+          value: $(params.MANIFEST_GIT_REPO)
+        - name: MANIFEST_GIT_BRANCH
+          value: $(params.MANIFEST_GIT_BRANCH)
+        - name: REQUESTER_ID
+          value: $(params.REQUESTER_ID)
+        - name: NAMESPACE_NAME
+          value: $(params.NAMESPACE_NAME)
+        - name: CLUSTER_ENV
+          value: $(params.CLUSTER_ENV)
+        - name: CLUSTER
+          value: $(params.CLUSTER)
+        - name: AUTO_MERGE_PR
+          value: $(params.AUTO_MERGE_PR)
+        - name: ACTION
+          value: create
+      runAfter:
+        - default-quotas-manifest-create
+        - default-network-policies-manifest-create
+        - default-rolebindings-manifest-create
+      taskRef:
+        kind: Task
+        name: push-to-manifest-repo
+      workspaces:
+        - name: output
+        - name: source
+
+  workspaces:
+    - name: source
+    - name: output

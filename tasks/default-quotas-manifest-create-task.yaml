@@ -1,0 +1,102 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: default-quotas-manifest-create
+  labels:
+    app.kubernetes.io/name: default-quotas-manifest-create
+    app.kubernetes.io/version: "0.1"
+spec:
+  description: >-
+    This task creates resource quota manifest files.
+  params:
+    - name: REQUESTER_ID
+      description: Requester ID
+      type: string
+    - name: NAMESPACE_NAME
+      description: Namespace name
+      type: string
+    - name: REQUESTS_CPU
+      description: CPU Resource Requests
+      type: string
+    - name: LIMITS_CPU
+      description: CPU Resource Limits
+      type: string
+    - name: MAX_PODS
+      description: Maximum Pods
+      type: string
+    - name: REQUESTS_MEMORY
+      description: Memory Resource Requests
+      type: string
+    - name: LIMITS_MEMORY
+      description: Memory Resource Limits
+      type: string
+  workspaces:
+    - name: source
+      description: Source workspace
+    - name: output
+      description: Output workspace for manifests
+  steps:
+    - name: create-quota-manifest
+      image: registry.redhat.io/ubi8/ubi:latest
+      script: |
+        #!/bin/bash
+        set -e
+        
+        # Create namespace directory if it doesn't exist
+        mkdir -p $(workspaces.output.path)/namespaces/$(params.NAMESPACE_NAME)
+        
+        # Create resource quota manifest
+        cat > $(workspaces.output.path)/namespaces/$(params.NAMESPACE_NAME)/resource-quota.yaml << EOF
+        apiVersion: v1
+        kind: ResourceQuota
+        metadata:
+          name: compute-resources
+          namespace: $(params.NAMESPACE_NAME)
+          labels:
+            app.kubernetes.io/managed-by: tekton-pipeline
+            app.kubernetes.io/created-by: $(params.REQUESTER_ID)
+          annotations:
+            pipeline.tekton.dev/created-by: $(params.REQUESTER_ID)
+        spec:
+          hard:
+            requests.cpu: $(params.REQUESTS_CPU)
+            limits.cpu: $(params.LIMITS_CPU)
+            pods: $(params.MAX_PODS)
+            requests.memory: $(params.REQUESTS_MEMORY)
+            limits.memory: $(params.LIMITS_MEMORY)
+          scopes:
+            - NotTerminating
+        ---
+        apiVersion: v1
+        kind: LimitRange
+        metadata:
+          name: resource-limits
+          namespace: $(params.NAMESPACE_NAME)
+          labels:
+            app.kubernetes.io/managed-by: tekton-pipeline
+            app.kubernetes.io/created-by: $(params.REQUESTER_ID)
+          annotations:
+            pipeline.tekton.dev/created-by: $(params.REQUESTER_ID)
+        spec:
+          limits:
+            - type: Container
+              default:
+                cpu: 500m
+                memory: 512Mi
+              defaultRequest:
+                cpu: 100m
+                memory: 128Mi
+              max:
+                cpu: 2
+                memory: 2Gi
+              min:
+                cpu: 50m
+                memory: 64Mi
+            - type: Pod
+              max:
+                cpu: $(params.LIMITS_CPU)
+                memory: $(params.LIMITS_MEMORY)
+        EOF
+        
+        echo "Resource quota manifest created successfully"
+        cat $(workspaces.output.path)/namespaces/$(params.NAMESPACE_NAME)/resource-quota.yaml

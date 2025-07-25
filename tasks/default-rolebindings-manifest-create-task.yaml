@@ -1,0 +1,109 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: default-rolebindings-manifest-create
+  labels:
+    app.kubernetes.io/name: default-rolebindings-manifest-create
+    app.kubernetes.io/version: "0.1"
+spec:
+  description: >-
+    This task creates default role binding manifest files.
+  params:
+    - name: REQUESTER_ID
+      description: Requester ID
+      type: string
+    - name: NAMESPACE_NAME
+      description: Namespace name
+      type: string
+  workspaces:
+    - name: source
+      description: Source workspace
+    - name: output
+      description: Output workspace for manifests
+  steps:
+    - name: create-rolebindings
+      image: registry.redhat.io/ubi8/ubi:latest
+      script: |
+        #!/bin/bash
+        set -e
+        
+        # Create namespace directory if it doesn't exist
+        mkdir -p $(workspaces.output.path)/namespaces/$(params.NAMESPACE_NAME)
+        
+        # Create role bindings manifest
+        cat > $(workspaces.output.path)/namespaces/$(params.NAMESPACE_NAME)/rolebindings.yaml << EOF
+        # Admin role binding for the requester
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: RoleBinding
+        metadata:
+          name: $(params.REQUESTER_ID)-admin
+          namespace: $(params.NAMESPACE_NAME)
+          labels:
+            app.kubernetes.io/managed-by: tekton-pipeline
+            app.kubernetes.io/created-by: $(params.REQUESTER_ID)
+          annotations:
+            pipeline.tekton.dev/created-by: $(params.REQUESTER_ID)
+        subjects:
+        - kind: User
+          name: $(params.REQUESTER_ID)
+          apiGroup: rbac.authorization.k8s.io
+        roleRef:
+          kind: ClusterRole
+          name: admin
+          apiGroup: rbac.authorization.k8s.io
+        ---
+        # Default service account with edit permissions
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: RoleBinding
+        metadata:
+          name: default-edit
+          namespace: $(params.NAMESPACE_NAME)
+          labels:
+            app.kubernetes.io/managed-by: tekton-pipeline
+            app.kubernetes.io/created-by: $(params.REQUESTER_ID)
+          annotations:
+            pipeline.tekton.dev/created-by: $(params.REQUESTER_ID)
+        subjects:
+        - kind: ServiceAccount
+          name: default
+          namespace: $(params.NAMESPACE_NAME)
+        roleRef:
+          kind: ClusterRole
+          name: edit
+          apiGroup: rbac.authorization.k8s.io
+        ---
+        # Builder service account
+        apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: builder
+          namespace: $(params.NAMESPACE_NAME)
+          labels:
+            app.kubernetes.io/managed-by: tekton-pipeline
+            app.kubernetes.io/created-by: $(params.REQUESTER_ID)
+          annotations:
+            pipeline.tekton.dev/created-by: $(params.REQUESTER_ID)
+        ---
+        # Builder role binding
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: RoleBinding
+        metadata:
+          name: builder-edit
+          namespace: $(params.NAMESPACE_NAME)
+          labels:
+            app.kubernetes.io/managed-by: tekton-pipeline
+            app.kubernetes.io/created-by: $(params.REQUESTER_ID)
+          annotations:
+            pipeline.tekton.dev/created-by: $(params.REQUESTER_ID)
+        subjects:
+        - kind: ServiceAccount
+          name: builder
+          namespace: $(params.NAMESPACE_NAME)
+        roleRef:
+          kind: ClusterRole
+          name: edit
+          apiGroup: rbac.authorization.k8s.io
+        EOF
+        
+        echo "Role bindings manifest created successfully"
+        cat $(workspaces.output.path)/namespaces/$(params.NAMESPACE_NAME)/rolebindings.yaml

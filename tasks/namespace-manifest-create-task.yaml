@@ -1,0 +1,95 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: namespace-manifest-create
+  labels:
+    app.kubernetes.io/name: namespace-manifest-create
+    app.kubernetes.io/version: "0.1"
+spec:
+  description: >-
+    This task creates namespace manifest files.
+  params:
+    - name: REQUESTER_ID
+      description: Requester ID
+      type: string
+    - name: NAMESPACE_NAME
+      description: Namespace name
+      type: string
+    - name: ENABLE_BACKUP
+      description: Mark Project for Backups
+      type: string
+      default: disabled
+    - name: ISTIO_DISCOVERY
+      description: Enable Istio discovery
+      type: string
+      default: disabled
+    - name: ISTIO_REV
+      description: Istio Revision
+      type: string
+      default: ''
+    - name: LABELS
+      description: Optional JSON String of Additional Namespace labels
+      type: string
+      default: '{}'
+  workspaces:
+    - name: source
+      description: Source workspace
+    - name: output
+      description: Output workspace for manifests
+  steps:
+    - name: create-namespace-manifest
+      image: registry.redhat.io/ubi8/ubi:latest
+      script: |
+        #!/bin/bash
+        set -e
+        
+        # Install required tools
+        yum install -y jq
+        
+        # Create namespace directory structure
+        mkdir -p $(workspaces.output.path)/namespaces/$(params.NAMESPACE_NAME)
+        
+        # Parse additional labels
+        ADDITIONAL_LABELS=""
+        if [ "$(params.LABELS)" != "{}" ]; then
+          echo "$(params.LABELS)" | jq -r 'to_entries[] | "    \(.key): \(.value)"' > /tmp/additional_labels
+          if [ -s /tmp/additional_labels ]; then
+            ADDITIONAL_LABELS=$(cat /tmp/additional_labels)
+          fi
+        fi
+        
+        # Create namespace manifest
+        cat > $(workspaces.output.path)/namespaces/$(params.NAMESPACE_NAME)/namespace.yaml << EOF
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: $(params.NAMESPACE_NAME)
+          labels:
+            app.kubernetes.io/managed-by: tekton-pipeline
+            app.kubernetes.io/created-by: $(params.REQUESTER_ID)
+        ${ADDITIONAL_LABELS}
+          annotations:
+            pipeline.tekton.dev/created-by: $(params.REQUESTER_ID)
+        EOF
+        
+        # Add Istio labels if enabled
+        if [ "$(params.ISTIO_DISCOVERY)" = "enabled" ]; then
+          cat >> $(workspaces.output.path)/namespaces/$(params.NAMESPACE_NAME)/namespace.yaml << EOF
+            istio-injection: enabled
+        EOF
+          if [ -n "$(params.ISTIO_REV)" ]; then
+            cat >> $(workspaces.output.path)/namespaces/$(params.NAMESPACE_NAME)/namespace.yaml << EOF
+            istio.io/rev: $(params.ISTIO_REV)
+        EOF
+          fi
+        fi
+        
+        # Add backup annotation if enabled
+        if [ "$(params.ENABLE_BACKUP)" = "enabled" ]; then
+          cat >> $(workspaces.output.path)/namespaces/$(params.NAMESPACE_NAME)/namespace.yaml << EOF
+            backup.velero.io/default-volumes-to-restic: 'true'
+        EOF
+        fi
+        
+        echo "Namespace manifest created successfully"
+        cat $(workspaces.output.path)/namespaces/$(params.NAMESPACE_NAME)/namespace.yaml

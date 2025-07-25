@@ -1,0 +1,54 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: create-namespace-run-$(params.NAMESPACE_NAME)
+  namespace: openshift-pipelines
+  labels:
+    app.kubernetes.io/name: openshift-pipelines
+    app.kubernetes.io/component: pipeline-run
+spec:
+  pipelineRef:
+    name: create-namespace
+  serviceAccountName: pipeline-service-account
+  params:
+    - name: MANIFEST_GIT_REPO
+      value: 'https://github.com/lostspy009/openshift-pipelines.git'
+    - name: MANIFEST_GIT_BRANCH
+      value: main
+    - name: REQUESTER_ID
+      value: user123  # Replace with actual requester ID
+    - name: NAMESPACE_NAME
+      value: sample-namespace  # Replace with desired namespace name
+    - name: CLUSTER_ENV
+      value: dev  # Replace with actual cluster environment
+    - name: CLUSTER
+      value: dev-cluster-01  # Replace with actual cluster name
+    - name: REQUESTS_CPU
+      value: "10"
+    - name: LIMITS_CPU
+      value: "30"
+    - name: MAX_PODS
+      value: "20"
+    - name: REQUESTS_MEMORY
+      value: 2Gi
+    - name: LIMITS_MEMORY
+      value: 4Gi
+    - name: ENABLE_BACKUP
+      value: disabled
+    - name: ISTIO_DISCOVERY
+      value: disabled
+    - name: ISTIO_REV
+      value: ''
+    - name: LABELS
+      value: '{"environment": "development", "team": "platform"}'
+    - name: AUTO_MERGE_PR
+      value: 'false'
+  workspaces:
+    - name: source
+      persistentVolumeClaim:
+        claimName: pipeline-source-workspace
+    - name: output
+      persistentVolumeClaim:
+        claimName: pipeline-output-workspace
+  timeouts:
+    pipeline: 1h0m0s
