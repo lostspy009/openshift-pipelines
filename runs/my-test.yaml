@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
-  name: create-namespace-run-sample
+  name: create-namespace-run-my-test
   namespace: openshift-pipelines
   labels:
     app.kubernetes.io/name: openshift-pipelines
