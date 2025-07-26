@@ -50,3 +50,14 @@ spec:
       workspaces:
         - name: output
           workspace: output
+    - name: apply-manifests
+      runAfter:
+        - create-namespace-with-quota
+      taskRef:
+        name: apply-manifests
+      params:
+        - name: NAMESPACE_NAME
+          value: $(params.NAMESPACE_NAME)
+      workspaces:
+        - name: output
+          workspace: output

@@ -1,0 +1,20 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: apply-manifests
+spec:
+  workspaces:
+    - name: output
+      description: Directory containing generated manifests
+  steps:
+    - name: apply-manifests
+      image: registry.redhat.io/openshift4/ose-cli
+      script: |
+        set -e
+        echo "Applying manifests from /workspace/output/generated/$(params.NAMESPACE_NAME)"
+        oc apply -f /workspace/output/generated/$(params.NAMESPACE_NAME)/namespace.yaml
+        oc apply -f /workspace/output/generated/$(params.NAMESPACE_NAME)/resource-quota.yaml
+  params:
+    - name: NAMESPACE_NAME
+      type: string
+      description: Namespace to apply
