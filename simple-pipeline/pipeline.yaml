@@ -1,0 +1,52 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: create-namespace-with-quota-pipeline
+spec:
+  params:
+    - name: NAMESPACE_NAME
+      type: string
+      description: Namespace to create
+    - name: REQUESTER_ID
+      type: string
+      description: Requester ID
+    - name: REQUESTS_CPU
+      type: string
+      description: CPU Resource Requests
+    - name: LIMITS_CPU
+      type: string
+      description: CPU Resource Limits
+    - name: MAX_PODS
+      type: string
+      description: Maximum Pods
+    - name: REQUESTS_MEMORY
+      type: string
+      description: Memory Resource Requests
+    - name: LIMITS_MEMORY
+      type: string
+      description: Memory Resource Limits
+  workspaces:
+    - name: output
+      description: Directory to save generated manifests
+  tasks:
+    - name: create-namespace-with-quota
+      taskRef:
+        name: create-namespace-with-quota
+      params:
+        - name: NAMESPACE_NAME
+          value: $(params.NAMESPACE_NAME)
+        - name: REQUESTER_ID
+          value: $(params.REQUESTER_ID)
+        - name: REQUESTS_CPU
+          value: $(params.REQUESTS_CPU)
+        - name: LIMITS_CPU
+          value: $(params.LIMITS_CPU)
+        - name: MAX_PODS
+          value: $(params.MAX_PODS)
+        - name: REQUESTS_MEMORY
+          value: $(params.REQUESTS_MEMORY)
+        - name: LIMITS_MEMORY
+          value: $(params.LIMITS_MEMORY)
+      workspaces:
+        - name: output
+          workspace: output

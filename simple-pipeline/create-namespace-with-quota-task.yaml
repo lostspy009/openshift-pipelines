@@ -1,0 +1,69 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: create-namespace-with-quota
+spec:
+  params:
+    - name: NAMESPACE_NAME
+      type: string
+      description: Namespace to create
+    - name: REQUESTER_ID
+      type: string
+      description: Requester ID
+    - name: REQUESTS_CPU
+      type: string
+      description: CPU Resource Requests
+    - name: LIMITS_CPU
+      type: string
+      description: CPU Resource Limits
+    - name: MAX_PODS
+      type: string
+      description: Maximum Pods
+    - name: REQUESTS_MEMORY
+      type: string
+      description: Memory Resource Requests
+    - name: LIMITS_MEMORY
+      type: string
+      description: Memory Resource Limits
+  workspaces:
+    - name: output
+      description: Directory to save generated manifests
+  steps:
+    - name: generate-manifests
+      image: registry.access.redhat.com/ubi8/ubi:latest
+      script: |
+        #!/bin/bash
+        set -e
+        OUTDIR="$(workspaces.output.path)/generated/$(params.NAMESPACE_NAME)"
+        mkdir -p "$OUTDIR"
+        # Namespace manifest
+        cat > "$OUTDIR/namespace.yaml" <<EOF
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: $(params.NAMESPACE_NAME)
+          labels:
+            created-by: $(params.REQUESTER_ID)
+            managed-by: tekton-pipeline
+        EOF
+        # ResourceQuota manifest
+        cat > "$OUTDIR/resource-quota.yaml" <<EOF
+        apiVersion: v1
+        kind: ResourceQuota
+        metadata:
+          name: compute-resources
+          namespace: $(params.NAMESPACE_NAME)
+          labels:
+            created-by: $(params.REQUESTER_ID)
+            managed-by: tekton-pipeline
+        spec:
+          hard:
+            requests.cpu: $(params.REQUESTS_CPU)
+            limits.cpu: $(params.LIMITS_CPU)
+            pods: $(params.MAX_PODS)
+            requests.memory: $(params.REQUESTS_MEMORY)
+            limits.memory: $(params.LIMITS_MEMORY)
+          scopes:
+            - NotTerminating
+        EOF
+        echo "✅ Manifests generated in $OUTDIR"

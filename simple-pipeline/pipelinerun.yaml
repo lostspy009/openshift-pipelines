@@ -1,0 +1,26 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: create-namespace-with-quota-run
+spec:
+  pipelineRef:
+    name: create-namespace-with-quota-pipeline
+  params:
+    - name: NAMESPACE_NAME
+      value: example-namespace
+    - name: REQUESTER_ID
+      value: demo-user
+    - name: REQUESTS_CPU
+      value: "500m"
+    - name: LIMITS_CPU
+      value: "1"
+    - name: MAX_PODS
+      value: "10"
+    - name: REQUESTS_MEMORY
+      value: "256Mi"
+    - name: LIMITS_MEMORY
+      value: "512Mi"
+  workspaces:
+    - name: output
+      persistentVolumeClaim:
+        claimName: pipeline-workspaces

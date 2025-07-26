@@ -67,7 +67,9 @@ spec:
         name: clone-manifest-repo
       workspaces:
         - name: output
+          workspace: source
         - name: source
+          workspace: source
 
     - name: namespace-manifest-create
       params:

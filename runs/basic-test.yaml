@@ -1,0 +1,51 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: test-basic-functionality-
+  namespace: openshift-pipelines
+spec:
+  pipelineSpec:
+    tasks:
+    - name: test-basic-functionality
+      taskSpec:
+        params:
+          - name: NAMESPACE_NAME
+            type: string
+          - name: REQUESTER_ID
+            type: string
+        steps:
+          - name: create-namespace-manifest
+            image: registry.access.redhat.com/ubi8/ubi:latest
+            script: |
+              #!/bin/bash
+              echo "🚀 Testing basic Tekton functionality..."
+              echo "Creating namespace: $(params.NAMESPACE_NAME)"
+              echo "Requested by: $(params.REQUESTER_ID)"
+              
+              echo "✅ Basic pipeline execution is working!"
+              
+              # Create a simple namespace manifest
+              cat << EOF
+              ---
+              apiVersion: v1
+              kind: Namespace
+              metadata:
+                name: $(params.NAMESPACE_NAME)
+                labels:
+                  created-by: $(params.REQUESTER_ID)
+                  managed-by: tekton-pipeline
+                  test: basic-functionality
+                annotations:
+                  pipeline.tekton.dev/created-by: $(params.REQUESTER_ID)
+              EOF
+      params:
+        - name: NAMESPACE_NAME
+          value: $(params.NAMESPACE_NAME)
+        - name: REQUESTER_ID
+          value: $(params.REQUESTER_ID)
+  params:
+    - name: NAMESPACE_NAME
+      value: basic-test-namespace
+    - name: REQUESTER_ID
+      value: user123
+  serviceAccountName: pipeline-service-account
